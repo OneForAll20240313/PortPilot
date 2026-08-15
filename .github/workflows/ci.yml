@@ -31,15 +31,15 @@ jobs:
         run: cmake --build build -j
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure -j
+        run: cd build && ctest --output-on-failure -j --output-junit Testing/TestResults.xml
 
       - name: Publish Test Report to PR
         if: success() || failure()
         uses: dorny/test-reporter@v1
         with:
           name: PortPilot Unit Tests
-          path: build/Testing/TAP/*.tap
-          reporter: tap
+          path: build/Testing/*.xml
+          reporter: junit
           fail-on-error: true
 
       - name: Upload Test Artifacts
