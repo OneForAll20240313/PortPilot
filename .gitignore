@@ -41,6 +41,7 @@ compile_commands.json
 .trae*/
 *.tmp
 *.swp
+docs-repo/
 
 # ---- 敏感信息 ----
 .env

@@ -13,11 +13,13 @@ FetchContent_MakeAvailable(googletest)
 # 单元测试可执行目标
 add_executable(portpilot_tests
     unit/core_sample_test.cpp
+    unit/domain_device_port_test.cpp
 )
 
 target_include_directories(portpilot_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(portpilot_tests PRIVATE
     portpilot_core
+    portpilot_domain
     GTest::gtest_main
 )
 
