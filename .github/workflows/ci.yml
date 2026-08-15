@@ -1,0 +1,51 @@
+name: CI - Build & Test
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & Test (Core)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake g++
+
+      # 说明：当前阶段仅构建并测试纯 C++ 核心层（无 Qt 依赖），
+      # gtest 经 FetchContent 拉取。GUI 层（Qt）在具备 Qt 环境后启用 BUILD_GUI=ON。
+      - name: Configure (isolated build dir)
+        run: cmake -S . -B build -GNinja -DCMAKE_BUILD_TYPE=Debug -DBUILD_GUI=OFF
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -j
+
+      - name: Publish Test Report to PR
+        if: success() || failure()
+        uses: dorny/test-reporter@v1
+        with:
+          name: PortPilot Unit Tests
+          path: build/Testing/TAP/*.tap
+          reporter: tap
+          fail-on-error: true
+
+      - name: Upload Test Artifacts
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: build/Testing/**
+          retention-days: 30

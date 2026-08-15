@@ -1,0 +1,50 @@
+# ---- 构建产物：禁止提交 ----
+build/
+build-*/
+cmake-build-*/
+out/
+bin/
+lib/
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+*.dylib
+*.exe
+*.dll
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+.ninja*
+_deps/
+
+# ---- 测试产物 ----
+Testing/
+*.gcda
+*.gcno
+*.profraw
+coverage/
+*.log
+
+# ---- IDE / 编辑器 ----
+.idea/
+.vscode/
+*.user
+*.autosave
+compile_commands.json
+
+# ---- 沙箱 / 临时 / 备份 ----
+.session_backup/
+.trae*/
+*.tmp
+*.swp
+
+# ---- 敏感信息 ----
+.env
+.env.*
+*.pem
+*.key
+credentials.json
