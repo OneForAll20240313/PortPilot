@@ -1,4 +1,4 @@
-# PortPilot 测试
+# PortPilot 单元测试
 # 统一使用 GoogleTest + GMock（见准则「自测开发环境规范」）
 # 通过 FetchContent 拉取 gtest，避免依赖系统包
 
@@ -21,7 +21,9 @@ target_link_libraries(portpilot_tests PRIVATE
     portpilot_core
     portpilot_plugin
     GTest::gtest_main
+    GTest::gmock
 )
+target_compile_features(portpilot_tests PRIVATE cxx_std_17)
 
 include(GoogleTest)
 gtest_discover_tests(portpilot_tests)
