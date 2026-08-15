@@ -6,12 +6,99 @@
 #include "common_types.h"
 #include "mock_device_port.h"
 #include "serial_worker.h"
+#include "platform/serial_backend.h"
 #include "network_transport.h"
 #include "file_repository.h"
 #include "protocol_engine.h"
 
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cerrno>
+#include <string>
+#include <chrono>
+#include <fcntl.h>
+#include <unistd.h>
+#include <termios.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
 namespace ppc = portpilot::core;
 namespace ppd = portpilot::domain;
+
+// =========================================================================
+// 测试辅助：StubSerialBackend（纯内存实现，不做真实系统调用）
+// 用于 SerialWorker 的参数校验 / 钩子逻辑 / 状态机等纯行为测试
+// =========================================================================
+class StubSerialBackend : public ppc::platform::ISerialBackend {
+public:
+    ppd::Result open(const ppd::ConnectTarget& config) override {
+        opened_ = true;
+        cfg_ = config;
+        return ppd::Result::Ok();
+    }
+    ppd::Result close() override {
+        opened_ = false;
+        return ppd::Result::Ok();
+    }
+    ppd::Result write(const ppd::Bytes& data) override {
+        last_written_ = data;
+        total_written_ += data.size();
+        return ppd::Result::Ok();
+    }
+    ppd::Bytes read() override {
+        if (!pending_.empty()) {
+            ppd::Bytes out = std::move(pending_.front());
+            pending_.erase(pending_.begin());
+            return out;
+        }
+        return {};
+    }
+    bool isOpen() const override { return opened_; }
+    ppd::ProbeResult probe(const ppd::ConnectTarget& params,
+                            ppd::ProbeCriteriaCallback onCriteria) override {
+        ppd::ProbeResult r;
+        r.confirmedTarget = params;
+        r.success = !onCriteria || onCriteria(params);
+        return r;
+    }
+    int64_t nativeHandle() const override { return -1; }
+    bool isBusy(const std::string&) const override { return false; }
+
+    // ---- 测试辅助 ----
+    void inject(const ppd::Bytes& d) { pending_.push_back(d); }
+    ppd::Bytes last_written() const { return last_written_; }
+    std::size_t total_written() const { return total_written_; }
+    ppd::ConnectTarget last_config() const { return cfg_; }
+
+private:
+    bool opened_{false};
+    ppd::ConnectTarget cfg_;
+    ppd::Bytes last_written_;
+    std::size_t total_written_{0};
+    std::vector<ppd::Bytes> pending_;
+};
+
+// PTY pair helper（同 core_serial_device_test.cpp 的定义，用于需要真实 open 的测试）
+namespace {
+struct PtyPair {
+    int master{-1};
+    std::string slave;
+    ~PtyPair() { if (master >= 0) ::close(master); }
+};
+std::unique_ptr<PtyPair> OpenPtyPair() {
+    auto p = std::make_unique<PtyPair>();
+    int m = ::posix_openpt(O_RDWR | O_NOCTTY);
+    if (m < 0) return nullptr;
+    if (::grantpt(m) != 0) { ::close(m); return nullptr; }
+    if (::unlockpt(m) != 0) { ::close(m); return nullptr; }
+    char buf[512] = {0};
+    if (::ptsname_r(m, buf, sizeof(buf)) != 0) { ::close(m); return nullptr; }
+    p->master = m;
+    p->slave = buf;
+    return p;
+}
+} // namespace
 
 // =========================================================================
 // 0. 基础 / Result / UUID（继续使用 core:: 模板版 Result<T>，非 DevicePort 契约）
@@ -37,9 +124,7 @@ TEST(CoreCommon, UUIDFormatV4) {
     const std::string b = gen_uuid_v4();
     EXPECT_EQ(a.size(), 36u);
     EXPECT_NE(a, b);
-    // 第 13 字符是 '4'（version 4）
     EXPECT_EQ(a[14], '4');
-    // 第 19 字符是 variant 8/9/a/b
     const char c = a[19];
     EXPECT_TRUE(c == '8' || c == '9' || c == 'a' || c == 'b' || c == 'A' || c == 'B');
 }
@@ -62,7 +147,7 @@ TEST(LoggerTest, LevelsAndFiltering) {
     });
 
     PP_INFO("tst") << "hello";
-    PP_DEBUG("tst") << "no show";  // 低于 level=Info 被过滤
+    PP_DEBUG("tst") << "no show";
     PP_WARN("tst") << "warn";
 
     EXPECT_EQ(infoCount, 1);
@@ -122,7 +207,7 @@ TEST(EventBusTest, OffRemovesSubscription) {
     int count = 0;
     auto id = bus.on("x.y", [&](const std::string&, const EventPayload&) { ++count; });
     EXPECT_TRUE(bus.off(id));
-    EXPECT_FALSE(bus.off(id));  // already removed
+    EXPECT_FALSE(bus.off(id));
     bus.emit("x.y");
     EXPECT_EQ(count, 0);
 }
@@ -205,10 +290,16 @@ TEST(MockDevicePortTest, OnDataCallback) {
 }
 
 // =========================================================================
-// 4. SerialWorker - 统一使用 domain::DevicePort 契约
+// 4. SerialWorker - Issue #50 Qt-free 重构后：
+//    参数校验部分使用 StubBackend（避免真实系统调用）
+//    真实 I/O 场景由 core_serial_device_test.cpp 中的 PTY 测试覆盖
 // =========================================================================
 TEST(SerialWorkerTest, RequiresSerialConfig) {
-    ppc::SerialWorker sw;
+    // 注入 StubBackend：不做真实 open，专注验证 SerialWorker 的参数校验逻辑
+    auto stub = std::make_unique<StubSerialBackend>();
+    StubSerialBackend* rawStub = stub.get();
+    ppc::SerialWorker sw(std::move(stub));
+
     ppd::ConnectTarget t;
     t.type = ppd::PortType::Network;  // 错的
     EXPECT_FALSE(sw.open(t).ok);
@@ -226,6 +317,8 @@ TEST(SerialWorkerTest, RequiresSerialConfig) {
     auto or_ = sw.open(t);
     ASSERT_TRUE(or_.ok) << or_.code << " " << or_.message;
     EXPECT_TRUE(sw.isOpen());
+    EXPECT_EQ(rawStub->last_config().port, "/dev/ttyS0");
+    EXPECT_EQ(rawStub->last_config().baud, 115200u);
     auto cfg = sw.serial_config();
     ASSERT_TRUE(cfg.has_value());
     EXPECT_EQ(cfg->port, "/dev/ttyS0");
@@ -233,10 +326,13 @@ TEST(SerialWorkerTest, RequiresSerialConfig) {
 }
 
 TEST(SerialWorkerTest, WriteAndRxInject) {
-    ppc::SerialWorker sw;
+    // 注入 StubBackend：专注测试 inject_rx / onData / write_observer 钩子
+    auto stub = std::make_unique<StubSerialBackend>();
+    ppc::SerialWorker sw(std::move(stub));
+
     ppd::ConnectTarget t;
     t.type = ppd::PortType::Serial;
-    t.port = "COM3";
+    t.port = "COM3";   // 假名字，stub 不关心
     t.baud = 9600;
     ASSERT_TRUE(sw.open(t).ok);
 
@@ -309,12 +405,11 @@ TEST(InMemoryFileRepositoryTest, KVBasic) {
 
     auto keys = repo.keys("a");
     ASSERT_TRUE(keys.ok());
-    // "a" 和 "aa"
     EXPECT_EQ(keys->size(), 2u);
 
     ASSERT_TRUE(repo.remove("a").ok());
     EXPECT_FALSE(repo.get("a").ok());
-    EXPECT_FALSE(repo.remove("a").ok());  // 再删报错
+    EXPECT_FALSE(repo.remove("a").ok());
 }
 
 TEST(InMemoryFileRepositoryTest, DocumentCRUD) {
@@ -370,14 +465,12 @@ TEST(ProtocolEngineTest, FixedLengthWithStartPattern) {
     BasicProtocolEngine eng;
     Bytes stream = {0x7E, 0x01, 0x02, 0x03, 0x04,
                     0x7E, 0x0A, 0x0B, 0x0C, 0x0D,
-                    0x7E, 0x00};  // 不完整的剩余
+                    0x7E, 0x00};
 
     auto pr = eng.parseByteStream(s, stream);
     EXPECT_EQ(pr.frames.size(), 2u);
     EXPECT_EQ(pr.frames[0].raw, (Bytes{0x7E, 0x01, 0x02, 0x03}));
-    // 解析时对齐 startPattern，丢弃中间的 0x04，从下一个 0x7E 再切 fixed=4
     EXPECT_EQ(pr.frames[1].raw, (Bytes{0x7E, 0x0A, 0x0B, 0x0C}));
-    // 剩余字节：{0x0D, 0x7E, 0x00} 先跳过 0x0D，留下 {0x7E, 0x00} 不足 4
     EXPECT_EQ(pr.leftover.size(), 2u);
 }
 
@@ -386,7 +479,7 @@ TEST(ProtocolEngineTest, VariableLengthWithCrc) {
     ProtocolSchema s;
     s.lengthType = LengthType::Variable;
     LengthField lf;
-    lf.offset = 1;  // [0] start (0x7E) [1-2] len (big-endian u16) [3..3+len-1] data
+    lf.offset = 1;
     lf.width = 2;
     lf.byteOrder = ByteOrder::Big;
     s.frameDef.lengthField = lf;
@@ -399,13 +492,13 @@ TEST(ProtocolEngineTest, VariableLengthWithCrc) {
     BasicProtocolEngine eng;
     Bytes frame;
     frame.push_back(0x7E);
-    frame.push_back(0x00); frame.push_back(0x02);  // len = 2（data 长度）
-    frame.push_back(0xAA); frame.push_back(0xBB);  // data
+    frame.push_back(0x00); frame.push_back(0x02);
+    frame.push_back(0xAA); frame.push_back(0xBB);
     auto c = BasicProtocolEngine::crc8(frame);
     frame.push_back(c);
 
     Bytes stream = frame;
-    stream.push_back(0x7E);  // 半个新帧头
+    stream.push_back(0x7E);
 
     auto pr = eng.parseByteStream(s, stream);
     ASSERT_EQ(pr.frames.size(), 1u);

@@ -310,7 +310,7 @@ TEST(SerialDeviceTest, DestructorClosesFd) {
         ppd::ConnectTarget cfg;
         cfg.port = pty->slave;
         ASSERT_TRUE(dev.open(cfg).ok);
-        fd = dev.fd();
+        fd = static_cast<int>(dev.nativeHandle());
         ASSERT_GE(fd, 0);
     }
     struct stat st{};
