@@ -39,7 +39,7 @@ jobs:
         with:
           name: PortPilot Unit Tests
           path: build/Testing/*.xml
-          reporter: junit
+          reporter: java-junit
           fail-on-error: true
 
       - name: Upload Test Artifacts
