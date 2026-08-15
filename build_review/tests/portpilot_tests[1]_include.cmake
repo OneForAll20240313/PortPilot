@@ -1,5 +1,0 @@
-if(EXISTS "/workspace/build_review/tests/portpilot_tests[1]_tests.cmake")
-  include("/workspace/build_review/tests/portpilot_tests[1]_tests.cmake")
-else()
-  add_test(portpilot_tests_NOT_BUILT portpilot_tests_NOT_BUILT)
-endif()

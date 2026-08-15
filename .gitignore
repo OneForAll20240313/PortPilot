@@ -1,6 +1,6 @@
 # ---- 构建产物：禁止提交 ----
-build/
-build-*/
+# 放宽为 build*/ 以覆盖 build_review/ 等同类命名（评审 D-02）
+build*/
 cmake-build-*/
 out/
 bin/
