@@ -10,12 +10,14 @@
 #include "file_repository.h"
 #include "protocol_engine.h"
 
-using namespace portpilot::core;
+namespace ppc = portpilot::core;
+namespace ppd = portpilot::domain;
 
 // =========================================================================
-// 0. 基础 / Result / UUID
+// 0. 基础 / Result / UUID（继续使用 core:: 模板版 Result<T>，非 DevicePort 契约）
 // =========================================================================
 TEST(CoreCommon, ResultOkAndError) {
+    using namespace portpilot::core;
     auto ok = make_ok<int>(42);
     EXPECT_TRUE(ok.ok());
     EXPECT_EQ(*ok, 42);
@@ -30,6 +32,7 @@ TEST(CoreCommon, ResultOkAndError) {
 }
 
 TEST(CoreCommon, UUIDFormatV4) {
+    using namespace portpilot::core;
     const std::string a = gen_uuid_v4();
     const std::string b = gen_uuid_v4();
     EXPECT_EQ(a.size(), 36u);
@@ -45,6 +48,7 @@ TEST(CoreCommon, UUIDFormatV4) {
 // 1. Logger
 // =========================================================================
 TEST(LoggerTest, LevelsAndFiltering) {
+    using namespace portpilot::core;
     auto& logger = Logger::instance();
     logger.clear_callbacks();
     logger.set_level(LogLevel::Info);
@@ -66,6 +70,7 @@ TEST(LoggerTest, LevelsAndFiltering) {
 }
 
 TEST(LoggerTest, StreamHelperFormat) {
+    using namespace portpilot::core;
     auto& logger = Logger::instance();
     logger.set_level(LogLevel::Trace);
     std::string got;
@@ -81,6 +86,7 @@ TEST(LoggerTest, StreamHelperFormat) {
 // 2. EventBus
 // =========================================================================
 TEST(EventBusTest, PubSubBasic) {
+    using namespace portpilot::core;
     auto& bus = EventBus::instance();
     bus.clear();
     int count = 0;
@@ -99,6 +105,7 @@ TEST(EventBusTest, PubSubBasic) {
 }
 
 TEST(EventBusTest, OnceFiresSingleTime) {
+    using namespace portpilot::core;
     auto& bus = EventBus::instance();
     bus.clear();
     int count = 0;
@@ -109,6 +116,7 @@ TEST(EventBusTest, OnceFiresSingleTime) {
 }
 
 TEST(EventBusTest, OffRemovesSubscription) {
+    using namespace portpilot::core;
     auto& bus = EventBus::instance();
     bus.clear();
     int count = 0;
@@ -120,6 +128,7 @@ TEST(EventBusTest, OffRemovesSubscription) {
 }
 
 TEST(EventBusTest, WildcardCatchesAll) {
+    using namespace portpilot::core;
     auto& bus = EventBus::instance();
     bus.clear();
     int total = 0;
@@ -130,6 +139,7 @@ TEST(EventBusTest, WildcardCatchesAll) {
 }
 
 TEST(EventBusTest, HandlerExceptionDoesNotBreakOthers) {
+    using namespace portpilot::core;
     auto& bus = EventBus::instance();
     bus.clear();
     int a = 0, b = 0;
@@ -141,51 +151,51 @@ TEST(EventBusTest, HandlerExceptionDoesNotBreakOthers) {
 }
 
 // =========================================================================
-// 3. MockDevicePort (L2-002)
+// 3. MockDevicePort (L2-002) - 统一使用 domain::DevicePort 契约
 // =========================================================================
 TEST(MockDevicePortTest, OpenCloseAndLoopback) {
-    MockDevicePort port;
+    ppc::MockDevicePort port;
     EXPECT_FALSE(port.isOpen());
 
-    ConnectTarget t;
-    t.type = ConnectionType::Serial;
-    t.serial = SerialConfig{"/dev/ttyUSB0", 115200};
-    ASSERT_TRUE(port.open(t).ok());
+    ppd::ConnectTarget t;
+    t.type = ppd::PortType::Serial;
+    t.port = "/dev/ttyUSB0";
+    t.baud = 115200;
+    auto or_ = port.open(t);
+    ASSERT_TRUE(or_.ok) << or_.code << " " << or_.message;
     EXPECT_TRUE(port.isOpen());
 
     port.set_loopback(true);
-    Bytes tx = {0x01, 0x02, 0x03, 0x04};
+    ppd::Bytes tx = {0x01, 0x02, 0x03, 0x04};
     auto wr = port.write(tx);
-    ASSERT_TRUE(wr.ok());
-    EXPECT_EQ(*wr, 4u);
+    ASSERT_TRUE(wr.ok) << wr.code << " " << wr.message;
     EXPECT_EQ(port.total_tx_bytes(), 4u);
 
-    auto rd = port.read(1024);
-    ASSERT_TRUE(rd.ok());
-    EXPECT_EQ(*rd, tx);
+    auto rd = port.read();
+    EXPECT_EQ(rd, tx);
 }
 
 TEST(MockDevicePortTest, FailInjection) {
-    MockDevicePort port;
+    ppc::MockDevicePort port;
     port.set_fail_next_open(true);
-    auto r = port.open(ConnectTarget{});
-    EXPECT_FALSE(r.ok());
-    EXPECT_EQ(r.error.code, ErrorCode::DEV_OPEN_FAILED);
+    auto r = port.open(ppd::ConnectTarget{});
+    EXPECT_FALSE(r.ok);
+    EXPECT_EQ(r.code, "DEV_OPEN_FAILED");
     EXPECT_FALSE(port.isOpen());
 
-    ASSERT_TRUE(port.open(ConnectTarget{}).ok());
+    ASSERT_TRUE(port.open(ppd::ConnectTarget{}).ok);
     port.set_fail_next_write(true);
-    EXPECT_FALSE(port.write(Bytes{0x00}).ok());
+    EXPECT_FALSE(port.write(ppd::Bytes{0x00}).ok);
 }
 
 TEST(MockDevicePortTest, OnDataCallback) {
-    MockDevicePort port;
-    ASSERT_TRUE(port.open(ConnectTarget{}).ok());
+    ppc::MockDevicePort port;
+    ASSERT_TRUE(port.open(ppd::ConnectTarget{}).ok);
     port.set_loopback(true);
     int cbCount = 0;
-    Bytes last;
-    port.onData([&](const Bytes& d) { ++cbCount; last = d; });
-    const Bytes d = {0xAA, 0xBB};
+    ppd::Bytes last;
+    port.onData([&](const ppd::Bytes& d) { ++cbCount; last = d; });
+    const ppd::Bytes d = {0xAA, 0xBB};
     port.write(d);
     EXPECT_EQ(cbCount, 1);
     EXPECT_EQ(last, d);
@@ -195,24 +205,26 @@ TEST(MockDevicePortTest, OnDataCallback) {
 }
 
 // =========================================================================
-// 4. SerialWorker
+// 4. SerialWorker - 统一使用 domain::DevicePort 契约
 // =========================================================================
 TEST(SerialWorkerTest, RequiresSerialConfig) {
-    SerialWorker sw;
-    ConnectTarget t;
-    t.type = ConnectionType::Network;  // 错的
-    EXPECT_FALSE(sw.open(t).ok());
+    ppc::SerialWorker sw;
+    ppd::ConnectTarget t;
+    t.type = ppd::PortType::Network;  // 错的
+    EXPECT_FALSE(sw.open(t).ok);
 
-    t.type = ConnectionType::Serial;
-    t.serial = SerialConfig{"", 9600};  // 空端口
-    EXPECT_FALSE(sw.open(t).ok());
+    t.type = ppd::PortType::Serial;
+    t.port = "";  // 空端口
+    t.baud = 9600;
+    EXPECT_FALSE(sw.open(t).ok);
 
-    t.serial->port = "/dev/ttyS0";
-    t.serial->baud = 0;
-    EXPECT_FALSE(sw.open(t).ok());
+    t.port = "/dev/ttyS0";
+    t.baud = 0;
+    EXPECT_FALSE(sw.open(t).ok);
 
-    t.serial->baud = 115200;
-    ASSERT_TRUE(sw.open(t).ok());
+    t.baud = 115200;
+    auto or_ = sw.open(t);
+    ASSERT_TRUE(or_.ok) << or_.code << " " << or_.message;
     EXPECT_TRUE(sw.isOpen());
     auto cfg = sw.serial_config();
     ASSERT_TRUE(cfg.has_value());
@@ -221,44 +233,46 @@ TEST(SerialWorkerTest, RequiresSerialConfig) {
 }
 
 TEST(SerialWorkerTest, WriteAndRxInject) {
-    SerialWorker sw;
-    ConnectTarget t;
-    t.type = ConnectionType::Serial;
-    t.serial = SerialConfig{"COM3", 9600};
-    ASSERT_TRUE(sw.open(t).ok());
+    ppc::SerialWorker sw;
+    ppd::ConnectTarget t;
+    t.type = ppd::PortType::Serial;
+    t.port = "COM3";
+    t.baud = 9600;
+    ASSERT_TRUE(sw.open(t).ok);
 
     std::atomic<int> cbHits{0};
-    sw.onData([&](const Bytes&) { ++cbHits; });
+    sw.onData([&](const ppd::Bytes&) { ++cbHits; });
 
     sw.inject_rx({0x01, 0x02});
     sw.inject_rx({0x03});
     EXPECT_EQ(cbHits.load(), 2);
 
-    auto r1 = sw.read(64);
-    ASSERT_TRUE(r1.ok());
-    EXPECT_EQ(r1->size(), 2u);
+    auto r1 = sw.read();
+    EXPECT_EQ(r1.size(), 2u);
 
-    Bytes sent;
-    sw.set_write_observer([&](const Bytes& d) { sent = d; });
+    ppd::Bytes sent;
+    sw.set_write_observer([&](const ppd::Bytes& d) { sent = d; });
     auto wr = sw.write({0x10, 0x20, 0x30});
-    ASSERT_TRUE(wr.ok());
-    EXPECT_EQ(*wr, 3u);
-    EXPECT_EQ(sent, (Bytes{0x10, 0x20, 0x30}));
+    ASSERT_TRUE(wr.ok) << wr.code << " " << wr.message;
+    EXPECT_EQ(sent, (ppd::Bytes{0x10, 0x20, 0x30}));
 }
 
 // =========================================================================
-// 5. NetworkTransport
+// 5. NetworkTransport - 统一使用 domain::DevicePort 契约
 // =========================================================================
 TEST(NetworkTransportTest, ValidateConfig) {
-    NetworkTransport nt;
-    ConnectTarget t;
-    t.type = ConnectionType::Serial;
-    EXPECT_FALSE(nt.open(t).ok());
-    t.type = ConnectionType::Network;
-    t.network = NetworkConfig{"", 0};
-    EXPECT_FALSE(nt.open(t).ok());
-    t.network = NetworkConfig{"127.0.0.1", 8080};
-    ASSERT_TRUE(nt.open(t).ok());
+    ppc::NetworkTransport nt;
+    ppd::ConnectTarget t;
+    t.type = ppd::PortType::Serial;
+    EXPECT_FALSE(nt.open(t).ok);
+    t.type = ppd::PortType::Network;
+    t.addr = "";
+    t.tcpPort = 0;
+    EXPECT_FALSE(nt.open(t).ok);
+    t.addr = "127.0.0.1";
+    t.tcpPort = 8080;
+    auto or_ = nt.open(t);
+    ASSERT_TRUE(or_.ok) << or_.code << " " << or_.message;
     EXPECT_TRUE(nt.isOpen());
     auto cfg = nt.last_config();
     ASSERT_TRUE(cfg.has_value());
@@ -267,20 +281,22 @@ TEST(NetworkTransportTest, ValidateConfig) {
 }
 
 TEST(NetworkTransportTest, WriteCounting) {
-    NetworkTransport nt;
-    ConnectTarget t;
-    t.type = ConnectionType::Network;
-    t.network = NetworkConfig{"x", 1000};
-    ASSERT_TRUE(nt.open(t).ok());
-    ASSERT_TRUE(nt.write({1, 2, 3}).ok());
-    ASSERT_TRUE(nt.write({4, 5}).ok());
+    ppc::NetworkTransport nt;
+    ppd::ConnectTarget t;
+    t.type = ppd::PortType::Network;
+    t.addr = "x";
+    t.tcpPort = 1000;
+    ASSERT_TRUE(nt.open(t).ok);
+    ASSERT_TRUE(nt.write({1, 2, 3}).ok);
+    ASSERT_TRUE(nt.write({4, 5}).ok);
     EXPECT_EQ(nt.total_tx(), 5u);
 }
 
 // =========================================================================
-// 6. FileRepository (InMemory)
+// 6. FileRepository (InMemory) - 继续使用 core:: 模板版 Result<T>
 // =========================================================================
 TEST(InMemoryFileRepositoryTest, KVBasic) {
+    using namespace portpilot::core;
     InMemoryFileRepository repo;
     EXPECT_FALSE(repo.get("a").ok());
     ASSERT_TRUE(repo.set("a", "1").ok());
@@ -302,6 +318,7 @@ TEST(InMemoryFileRepositoryTest, KVBasic) {
 }
 
 TEST(InMemoryFileRepositoryTest, DocumentCRUD) {
+    using namespace portpilot::core;
     InMemoryFileRepository repo;
     EXPECT_FALSE(repo.load_document("id1", "protocols").ok());
 
@@ -322,9 +339,10 @@ TEST(InMemoryFileRepositoryTest, DocumentCRUD) {
 }
 
 // =========================================================================
-// 7. ProtocolEngine (Basic)
+// 7. ProtocolEngine (Basic) - 继续使用 core:: 模板版 Result<T>
 // =========================================================================
 TEST(ProtocolEngineUtil, EncodingDecodingRoundtrip) {
+    using namespace portpilot::core;
     Bytes buf;
     BasicProtocolEngine::encode_uint(buf, 0, 2, ByteOrder::Big, 0x1234);
     EXPECT_EQ(buf, (Bytes{0x12, 0x34}));
@@ -335,11 +353,13 @@ TEST(ProtocolEngineUtil, EncodingDecodingRoundtrip) {
 }
 
 TEST(ProtocolEngineUtil, HexConversions) {
+    using namespace portpilot::core;
     EXPECT_EQ(BasicProtocolEngine::hex_to_bytes("7E0D0A"), (Bytes{0x7E, 0x0D, 0x0A}));
     EXPECT_EQ(BasicProtocolEngine::bytes_to_hex(Bytes{0x01, 0xAB}), "01ab");
 }
 
 TEST(ProtocolEngineTest, FixedLengthWithStartPattern) {
+    using namespace portpilot::core;
     ProtocolSchema s;
     s.id = "p1";
     s.name = "FixedProto";
@@ -362,6 +382,7 @@ TEST(ProtocolEngineTest, FixedLengthWithStartPattern) {
 }
 
 TEST(ProtocolEngineTest, VariableLengthWithCrc) {
+    using namespace portpilot::core;
     ProtocolSchema s;
     s.lengthType = LengthType::Variable;
     LengthField lf;
@@ -393,6 +414,7 @@ TEST(ProtocolEngineTest, VariableLengthWithCrc) {
 }
 
 TEST(ProtocolEngineTest, EncodeFixedAndExtractFields) {
+    using namespace portpilot::core;
     ProtocolSchema s;
     s.lengthType = LengthType::Fixed;
     s.frameDef.fixedLength = 6;
@@ -423,6 +445,7 @@ TEST(ProtocolEngineTest, EncodeFixedAndExtractFields) {
 }
 
 TEST(ProtocolEngineTest, EncodeAndParseRoundtripVariable) {
+    using namespace portpilot::core;
     ProtocolSchema s;
     s.lengthType = LengthType::Variable;
     LengthField lf; lf.offset = 1; lf.width = 2; lf.byteOrder = ByteOrder::Big;
