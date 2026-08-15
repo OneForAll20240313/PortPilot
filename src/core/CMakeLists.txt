@@ -13,8 +13,12 @@
 add_library(portpilot_core STATIC
     common_types.cpp
     core.cpp
+    serial_device.cpp
     protocol_engine.cpp
 )
 
-target_include_directories(portpilot_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(portpilot_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/src
+)
 target_compile_features(portpilot_core PUBLIC cxx_std_17)
