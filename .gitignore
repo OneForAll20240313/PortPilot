@@ -49,3 +49,5 @@ docs-repo/
 *.pem
 *.key
 credentials.json
+# 文档仓库嵌套，外层忽略
+portpilot-design-docs/
