@@ -19,6 +19,13 @@ add_executable(portpilot_tests
 )
 
 target_include_directories(portpilot_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+# gtest 头以 SYSTEM 方式引入：第三方头文件的告警不参与 -Werror 判定
+target_include_directories(portpilot_tests SYSTEM PRIVATE
+    ${googletest_SOURCE_DIR}/googletest/include
+    ${googletest_SOURCE_DIR}/googlemock/include
+)
+# 编码规范硬性要求：测试代码同样禁止 error / warning / note
+target_compile_options(portpilot_tests PRIVATE -Wall -Wextra -Werror)
 # 确保 glibc 暴露 posix_openpt / ptsname_r / grantpt / unlockpt 等声明
 target_compile_definitions(portpilot_tests PRIVATE
     _DEFAULT_SOURCE

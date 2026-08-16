@@ -1,6 +1,5 @@
-#define _XOPEN_SOURCE 600
-#define _DEFAULT_SOURCE
-#define _GNU_SOURCE
+// glibc 特性宏由 tests/CMakeLists.txt 的 target_compile_definitions 统一注入
+// （_DEFAULT_SOURCE / _XOPEN_SOURCE=600 / _GNU_SOURCE），此处不再重复定义，避免重定义 warning
 #include <gtest/gtest.h>
 #include "core/serial_device.h"
 #include "domain/types.h"
@@ -277,7 +276,6 @@ TEST(SerialDeviceTest, UnsupportedBaudRejected) {
 }
 
 TEST(SerialDeviceTest, PermissionDeniedMessageFormat) {
-    const char* path = "/tmp/portpilot_no_perm_XXXXXX";
     char tmpl[256] = {0};
     std::snprintf(tmpl, sizeof(tmpl), "/tmp/portpilot_no_perm_XXXXXX");
     int fd = ::mkstemp(tmpl);
