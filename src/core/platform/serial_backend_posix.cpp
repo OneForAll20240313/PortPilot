@@ -19,12 +19,14 @@ using domain::ErrorCode;
 
 namespace {
 
-const ErrorCode ERR_DEVICE_NO_SUCH     = "DEVICE_NO_SUCH";
-const ErrorCode ERR_DEVICE_PERMISSION  = "DEVICE_PERMISSION";
-const ErrorCode ERR_DEVICE_BUSY        = "DEVICE_BUSY";
-const ErrorCode ERR_DEVICE_NOT_OPEN    = "DEVICE_NOT_OPEN";
-const ErrorCode ERR_DEVICE_IO_FAILED   = "DEVICE_IO_FAILED";
-const ErrorCode ERR_DEVICE_CONFIG      = "DEVICE_CONFIG_FAILED";
+// 设备错误码统一引用 Domain 公共 SSOT（domain/types.h k* 常量），
+// 不再各自维护重复字符串，保证各层语义一致（需求 #33 DoD）
+const ErrorCode ERR_DEVICE_NO_SUCH     = domain::kNoSuchDeviceError;
+const ErrorCode ERR_DEVICE_PERMISSION  = domain::kDevicePermissionError;
+const ErrorCode ERR_DEVICE_BUSY        = domain::kDeviceBusyError;
+const ErrorCode ERR_DEVICE_NOT_OPEN    = domain::kDeviceNotOpenError;
+const ErrorCode ERR_DEVICE_IO_FAILED   = domain::kDeviceIoFailedError;
+const ErrorCode ERR_DEVICE_CONFIG      = domain::kDeviceConfigError;
 const ErrorCode ERR_SESS_PARAM_INVALID = "SESS_PARAM_INVALID";
 
 speed_t BaudToSpeedT(uint32_t baud) {
@@ -104,7 +106,7 @@ Result SerialBackendPosix::OpenErrorFromErrno(int err, const std::string& path) 
             return Result::Err(ERR_SESS_PARAM_INVALID,
                                "参数非法: " + path + " (" + std::strerror(err) + ")");
         default:
-            return Result::Err("DEVICE_OPEN_FAILED",
+            return Result::Err(domain::kDeviceOpenFailedError,
                                "打开设备失败: " + path + " (" + std::strerror(err) + ")");
     }
 }
