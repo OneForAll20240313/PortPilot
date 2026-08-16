@@ -79,27 +79,6 @@ private:
     std::vector<ppd::Bytes> pending_;
 };
 
-// PTY pair helper（同 core_serial_device_test.cpp 的定义，用于需要真实 open 的测试）
-namespace {
-struct PtyPair {
-    int master{-1};
-    std::string slave;
-    ~PtyPair() { if (master >= 0) ::close(master); }
-};
-std::unique_ptr<PtyPair> OpenPtyPair() {
-    auto p = std::make_unique<PtyPair>();
-    int m = ::posix_openpt(O_RDWR | O_NOCTTY);
-    if (m < 0) return nullptr;
-    if (::grantpt(m) != 0) { ::close(m); return nullptr; }
-    if (::unlockpt(m) != 0) { ::close(m); return nullptr; }
-    char buf[512] = {0};
-    if (::ptsname_r(m, buf, sizeof(buf)) != 0) { ::close(m); return nullptr; }
-    p->master = m;
-    p->slave = buf;
-    return p;
-}
-} // namespace
-
 // =========================================================================
 // 0. 基础 / Result / UUID（继续使用 core:: 模板版 Result<T>，非 DevicePort 契约）
 // =========================================================================
