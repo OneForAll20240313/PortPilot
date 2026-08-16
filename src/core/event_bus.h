@@ -6,6 +6,7 @@
 #include <vector>
 #include <mutex>
 #include <any>
+#include <algorithm>
 #include <optional>
 #include <cstdint>
 #include "common_types.h"
