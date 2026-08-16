@@ -51,6 +51,22 @@ struct Result {
     }
 };
 
+// ---------------------------------------------------------------------------
+// 设备层错误码公共常量（SSOT）
+//
+// 对齐 service-api.md §9 DevicePort 接口错误约定与需求文档 2.2.1/9.3：
+//   - 需求 DoD「设备不存在时返回 NoSuchDeviceError 提示」→ kNoSuchDeviceError
+//   - 打开失败需区分权限（PermissionError）与设备不存在（NoSuchDeviceError）
+// 值保持与既有后端实现一致（#37/PR#48 已验收，勿变更字符串值）。
+// ---------------------------------------------------------------------------
+inline constexpr const char* kNoSuchDeviceError    = "DEVICE_NO_SUCH";       // 设备不存在（NoSuchDeviceError）
+inline constexpr const char* kDevicePermissionError = "DEVICE_PERMISSION";   // 无权限访问设备（PermissionError）
+inline constexpr const char* kDeviceBusyError       = "DEVICE_BUSY";         // 设备被占用
+inline constexpr const char* kDeviceNotOpenError    = "DEVICE_NOT_OPEN";     // 设备未打开
+inline constexpr const char* kDeviceIoFailedError   = "DEVICE_IO_FAILED";    // 收发 I/O 失败
+inline constexpr const char* kDeviceConfigError     = "DEVICE_CONFIG_FAILED";// 串口参数配置失败
+inline constexpr const char* kDeviceOpenFailedError = "DEVICE_OPEN_FAILED";  // 打开设备失败（其它原因）
+
 struct ConnectTarget {
     PortType type{PortType::Serial};
 

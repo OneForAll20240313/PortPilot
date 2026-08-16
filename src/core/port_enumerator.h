@@ -18,6 +18,9 @@ namespace portpilot::core {
 class PortEnumerator : public domain::DevicePortEnumerator {
 public:
     domain::PortEnumResult listAvailablePorts() override;
+
+    // 校验/探测手动输入的自定义设备路径（需求 #33）
+    domain::PortEnumResult probePort(const std::string& path) override;
 };
 
 } // namespace portpilot::core

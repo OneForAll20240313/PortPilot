@@ -14,12 +14,14 @@ using domain::ErrorCode;
 
 namespace {
 
-const ErrorCode ERR_DEVICE_NO_SUCH     = "DEVICE_NO_SUCH";
-const ErrorCode ERR_DEVICE_PERMISSION  = "DEVICE_PERMISSION";
-const ErrorCode ERR_DEVICE_BUSY        = "DEVICE_BUSY";
-const ErrorCode ERR_DEVICE_NOT_OPEN    = "DEVICE_NOT_OPEN";
-const ErrorCode ERR_DEVICE_IO_FAILED   = "DEVICE_IO_FAILED";
-const ErrorCode ERR_DEVICE_CONFIG      = "DEVICE_CONFIG_FAILED";
+// 设备错误码统一引用 Domain 公共 SSOT（domain/types.h k* 常量），
+// 不再各自维护重复字符串，保证各层语义一致（需求 #33 DoD）
+const ErrorCode ERR_DEVICE_NO_SUCH     = domain::kNoSuchDeviceError;
+const ErrorCode ERR_DEVICE_PERMISSION  = domain::kDevicePermissionError;
+const ErrorCode ERR_DEVICE_BUSY        = domain::kDeviceBusyError;
+const ErrorCode ERR_DEVICE_NOT_OPEN    = domain::kDeviceNotOpenError;
+const ErrorCode ERR_DEVICE_IO_FAILED   = domain::kDeviceIoFailedError;
+const ErrorCode ERR_DEVICE_CONFIG      = domain::kDeviceConfigError;
 const ErrorCode ERR_SESS_PARAM_INVALID = "SESS_PARAM_INVALID";
 
 // DCB 波特率映射：Windows 用 DWORD 直接表示数值（如 9600, 115200...）
@@ -96,12 +98,12 @@ Result SerialBackendWindows::OpenErrorFromWin32(DWORD err, const std::string& pa
             } else {
                 msg = "Win32 error " + std::to_string(err);
             }
-            return Result::Err("DEVICE_OPEN_FAILED", "打开设备失败: " + path + " - " + msg);
+            return Result::Err(domain::kDeviceOpenFailedError, "打开设备失败: " + path + " - " + msg);
         }
     }
 #else
     (void)err;
-    return Result::Err("DEVICE_OPEN_FAILED", "打开设备失败: " + path + " (非 Windows 平台占位)");
+    return Result::Err(domain::kDeviceOpenFailedError, "打开设备失败: " + path + " (非 Windows 平台占位)");
 #endif
 }
 
@@ -264,7 +266,7 @@ Result SerialBackendWindows::open(const ConnectTarget& config) {
     return Result::Ok();
 #else
     (void)config;
-    return Result::Err("DEVICE_OPEN_FAILED", "SerialBackendWindows 仅在 Windows 可用");
+    return Result::Err(domain::kDeviceOpenFailedError, "SerialBackendWindows 仅在 Windows 可用");
 #endif
 }
 

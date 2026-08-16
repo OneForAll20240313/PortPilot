@@ -44,6 +44,13 @@ public:
 
     // 枚举系统可用串口（含 pty 等非标准设备）
     virtual PortEnumResult listAvailablePorts() = 0;
+
+    // 校验/探测手动输入的自定义设备路径（需求 #33：支持任意路径如 /dev/pts/1）
+    // 语义对齐 A-212 probePort：离线可检测，结果回填确认后连接。
+    // 成功 → ok=true 且 ports 含该路径的 PortInfo（可打开且可配置串口属性）；
+    // 失败 → ok=false，code 对齐设备层公共错误码（kNoSuchDeviceError /
+    //        kDevicePermissionError / kDeviceBusyError / kDeviceConfigError）。
+    virtual PortEnumResult probePort(const std::string& path) = 0;
 };
 
 using DevicePortEnumeratorPtr = std::unique_ptr<DevicePortEnumerator>;

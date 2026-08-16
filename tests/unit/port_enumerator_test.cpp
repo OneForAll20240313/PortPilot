@@ -94,3 +94,34 @@ TEST(PortEnumeratorTest, EnumeratesNonStandardPts) {
         EXPECT_TRUE(dev.close().ok);
     }
 }
+
+TEST(PortEnumeratorTest, ProbePortEmptyPath) {
+    ppc::PortEnumerator en;
+    auto res = en.probePort("");
+    EXPECT_FALSE(res.ok);
+    EXPECT_EQ(res.code, "SESS_PARAM_INVALID");
+}
+
+TEST(PortEnumeratorTest, ProbePortNoSuchDevice) {
+    // 需求 #33 DoD：设备不存在返回 NoSuchDeviceError 提示
+    ppc::PortEnumerator en;
+    auto res = en.probePort("/this/path/does/not/exist/portpilot_probe");
+    EXPECT_FALSE(res.ok);
+    EXPECT_EQ(res.code, ppd::kNoSuchDeviceError);
+    EXPECT_NE(res.message.find("设备不存在"), std::string::npos);
+}
+
+TEST(PortEnumeratorTest, ProbePortPtySuccess) {
+    // 需求 #33：手动输入多级自定义路径（/dev/pts/X）应探测可达
+    auto pty = OpenPtyPair();
+    if (pty == nullptr) {
+        GTEST_SKIP() << "系统不支持 pty，跳过";
+        return;
+    }
+    ppc::PortEnumerator en;
+    auto res = en.probePort(pty->slave);
+    ASSERT_TRUE(res.ok) << res.code << " " << res.message;
+    ASSERT_EQ(res.ports.size(), 1u);
+    EXPECT_EQ(res.ports[0].id, pty->slave);
+    EXPECT_EQ(res.ports[0].systemLocation, pty->slave);
+}

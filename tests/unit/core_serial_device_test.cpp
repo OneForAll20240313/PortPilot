@@ -35,7 +35,7 @@ TEST(SerialDeviceTest, NoSuchDevice) {
     cfg.port = "/this/path/does/not/exist/portpilot_test";
     auto r = dev.open(cfg);
     EXPECT_FALSE(r.ok);
-    EXPECT_EQ(r.code, "DEVICE_NO_SUCH");
+    EXPECT_EQ(r.code, ppd::kNoSuchDeviceError);
     EXPECT_NE(r.message.find("设备不存在"), std::string::npos);
 }
 
@@ -45,7 +45,7 @@ TEST(SerialDeviceTest, NoSuchDeviceSingleComponent) {
     cfg.port = "/no_such_device_portpilot_xyz_12345";
     auto r = dev.open(cfg);
     EXPECT_FALSE(r.ok);
-    EXPECT_EQ(r.code, "DEVICE_NO_SUCH");
+    EXPECT_EQ(r.code, ppd::kNoSuchDeviceError);
 }
 
 TEST(SerialDeviceTest, NotOpenState) {
@@ -53,12 +53,12 @@ TEST(SerialDeviceTest, NotOpenState) {
     EXPECT_FALSE(dev.isOpen());
     auto w = dev.write({0x01, 0x02});
     EXPECT_FALSE(w.ok);
-    EXPECT_EQ(w.code, "DEVICE_NOT_OPEN");
+    EXPECT_EQ(w.code, ppd::kDeviceNotOpenError);
     auto rd = dev.read();
     EXPECT_TRUE(rd.empty());
     auto c = dev.close();
     EXPECT_FALSE(c.ok);
-    EXPECT_EQ(c.code, "DEVICE_NOT_OPEN");
+    EXPECT_EQ(c.code, ppd::kDeviceNotOpenError);
 }
 
 namespace {
@@ -210,7 +210,7 @@ TEST(SerialDeviceTest, DoubleOpenRejected) {
     cfg2.port = pty->slave;
     auto r = dev.open(cfg2);
     EXPECT_FALSE(r.ok);
-    EXPECT_EQ(r.code, "DEVICE_BUSY");
+    EXPECT_EQ(r.code, ppd::kDeviceBusyError);
     EXPECT_TRUE(dev.close().ok);
 }
 
@@ -295,7 +295,7 @@ TEST(SerialDeviceTest, PermissionDeniedMessageFormat) {
         GTEST_SKIP() << "running as root; permission test skipped";
     }
     EXPECT_FALSE(r.ok);
-    EXPECT_EQ(r.code, "DEVICE_PERMISSION");
+    EXPECT_EQ(r.code, ppd::kDevicePermissionError);
     EXPECT_NE(r.message.find("dialout"), std::string::npos);
 }
 
