@@ -30,3 +30,22 @@ if(BUILD_TESTING)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+# ---- Doxygen API 文档（可选，-DBUILD_DOCS=OFF 关闭） ----
+# 输出固定到独立构建目录 <build>/docs，禁止源码目录生成产物（见准则·源码路径禁止构建产物）。
+option(BUILD_DOCS "Build Doxygen API documentation" ON)
+if(BUILD_DOCS)
+    find_package(Doxygen QUIET)
+    if(Doxygen_FOUND)
+        set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/docs")
+        set(DOXYGEN_GENERATE_HTML YES)
+        set(DOXYGEN_GENERATE_LATEX NO)
+        set(DOXYGEN_USE_MDFILE_AS_MAINPAGE "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+        set(DOXYGEN_EXTRACT_ALL YES)
+        set(DOXYGEN_SOURCE_BROWSER YES)
+        doxygen_add_docs(doxygen-docs
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+            COMMENT "Generate PortPilot API documentation (HTML)")
+    endif()
+endif()

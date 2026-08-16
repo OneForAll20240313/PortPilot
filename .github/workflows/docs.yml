@@ -1,0 +1,57 @@
+name: Docs - Doxygen & Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+# 只允许一个部署任务并发
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build-docs:
+    name: Build Doxygen HTML
+    runs-on: ubuntu-latest
+    outputs:
+      artifact: doxygen-html
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Doxygen
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz cmake g++
+
+      - name: Configure (docs target, isolated build dir)
+        run: cmake -S . -B build -GNinja -DCMAKE_BUILD_TYPE=Release -DBUILD_GUI=OFF -DBUILD_DOCS=ON
+
+      - name: Build Doxygen docs
+        run: cmake --build build --target doxygen-docs -j
+
+      - name: Verify docs output
+        run: test -f build/docs/html/index.html && echo "index.html OK"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/docs/html
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build-docs
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
