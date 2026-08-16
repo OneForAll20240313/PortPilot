@@ -35,6 +35,7 @@ if(WIN32)
 else()
     list(APPEND PORTPILOT_CORE_SOURCES
         platform/serial_backend_posix.cpp
+        port_enumerator.cpp
     )
 endif()
 

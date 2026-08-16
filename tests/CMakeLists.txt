@@ -16,6 +16,7 @@ add_executable(portpilot_tests
     unit/domain_device_port_test.cpp
     unit/core_serial_device_test.cpp
     unit/plugin_test.cpp
+    unit/port_enumerator_test.cpp
 )
 
 target_include_directories(portpilot_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
