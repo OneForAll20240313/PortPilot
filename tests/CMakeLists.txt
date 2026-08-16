@@ -3,9 +3,11 @@
 # 通过 FetchContent 拉取 gtest，避免依赖系统包
 
 include(FetchContent)
+set(CMAKE_POLICY_DEFAULT_CMP0135 NEW)
 FetchContent_Declare(
     googletest
     URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.tar.gz
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)

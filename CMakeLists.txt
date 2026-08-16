@@ -10,9 +10,16 @@ project(PortPilot
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
-set(CMAKE_AUTOUIC ON)
+
+# --- Qt 探测：仅当找到 Qt 才启用 AUTOMOC / AUTORCC / AUTOUIC ---
+# 无 Qt 环境（如 CI -DBUILD_GUI=OFF）只编译纯 C++ 核心层，
+# 不开启 AUTOGEN，避免对每个 target 产生 "No valid Qt version found" 无意义告警。
+find_package(Qt6 QUIET COMPONENTS Widgets)
+if(Qt6_FOUND)
+    set(CMAKE_AUTOMOC ON)
+    set(CMAKE_AUTORCC ON)
+    set(CMAKE_AUTOUIC ON)
+endif()
 
 # 编译产物统一输出到构建目录，禁止在源码目录编译
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
