@@ -24,10 +24,12 @@ if(BUILD_GUI)
     add_subdirectory(ui)
 endif()
 
-# 主程序入口（无 Qt 环境时仍可编译核心层，但不产出 GUI 主程序）
+# 主程序入口（#56 与 GUI 解耦：无 Qt 环境时仍产出 portpilot 可执行文件，
+# 走 CLI/服务模式；有 Qt 环境时额外编译 main_gui.cpp 进入 GUI 宿主）
 if(BUILD_GUI)
     add_executable(portpilot
         main.cpp
+        main_gui.cpp
     )
     target_link_libraries(portpilot PRIVATE
         portpilot_core
@@ -37,4 +39,17 @@ if(BUILD_GUI)
     )
     # 与 UI 层一致禁用 Qt 关键字宏，避免 core::EventBus::emit 冲突（qt_signal_bridge 亦依赖）
     target_compile_definitions(portpilot PRIVATE QT_NO_KEYWORDS)
+else()
+    add_executable(portpilot
+        main.cpp
+    )
+    target_link_libraries(portpilot PRIVATE
+        portpilot_core
+        portpilot_domain
+        portpilot_service
+        portpilot_plugin
+    )
 endif()
+
+# 将 BUILD_GUI 传导为编译宏，main.cpp 依据其选择入口分支
+target_compile_definitions(portpilot PRIVATE BUILD_GUI=$<BOOL:${BUILD_GUI}>)
