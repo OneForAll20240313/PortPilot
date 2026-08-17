@@ -125,3 +125,26 @@ TEST(PortEnumeratorTest, ProbePortPtySuccess) {
     EXPECT_EQ(res.ports[0].id, pty->slave);
     EXPECT_EQ(res.ports[0].systemLocation, pty->slave);
 }
+
+TEST(PortEnumeratorTest, ProbePortPermissionDenied) {
+    // 需求 #35：probePort 探测手动路径无权限时应返回 DEVICE_PERMISSION 明确提示，不得静默失败
+    char tmpl[256] = {0};
+    std::snprintf(tmpl, sizeof(tmpl), "/tmp/portpilot_probe_no_perm_XXXXXX");
+    int fd = ::mkstemp(tmpl);
+    if (fd < 0) GTEST_SKIP() << "cannot create temp file";
+    ::close(fd);
+    ::chmod(tmpl, 0000);
+
+    ppc::PortEnumerator en;
+    auto res = en.probePort(tmpl);
+
+    ::chmod(tmpl, 0644);
+    ::unlink(tmpl);
+
+    if (::geteuid() == 0) {
+        GTEST_SKIP() << "running as root; permission test skipped";
+    }
+    EXPECT_FALSE(res.ok);
+    EXPECT_EQ(res.code, ppd::kDevicePermissionError);
+    EXPECT_NE(res.message.find("dialout"), std::string::npos);
+}
