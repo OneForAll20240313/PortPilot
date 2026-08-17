@@ -43,6 +43,12 @@ public:
     // 对齐 A-301 onData(ConnectionId, bytes) → 发射 buffer.dataReceived。
     void pushData(const std::string& connectionId, const domain::Bytes& data);
 
+    // A-301 契约方法名别名：语义与 pushData 相同（承接 DevicePort 接收数据，
+    // 发射 buffer.dataReceived），提供与 service-api.md §2 A-301 一致的入口。
+    void onData(const std::string& connectionId, const domain::Bytes& data) {
+        pushData(connectionId, data);
+    }
+
     // 取消事件订阅
     void off(std::uint64_t id);
 

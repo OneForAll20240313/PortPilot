@@ -83,3 +83,22 @@ TEST(BufferServiceTest, NullHandlerRejected) {
     pps::BufferService buffer;
     EXPECT_EQ(buffer.onDataReceived(nullptr), 0u);
 }
+
+// A-301 契约方法名别名 onData 语义与 pushData 一致
+TEST(BufferServiceTest, OnDataAliasEmitDataReceived) {
+    ppc::EventBus::instance().clear();
+    pps::BufferService buffer;
+
+    ppd::Bytes cap;
+    int hits = 0;
+    buffer.onDataReceived([&](const std::string&, const ppc::EventPayload& payload) {
+        ++hits;
+        auto bIt = payload.find("bytes");
+        ASSERT_NE(bIt, payload.end());
+        cap = std::any_cast<ppd::Bytes>(bIt->second);
+    });
+
+    buffer.onData("conn-alias", {0xDE, 0xAD});
+    EXPECT_EQ(hits, 1);
+    EXPECT_EQ(cap, (ppd::Bytes{0xDE, 0xAD}));
+}
