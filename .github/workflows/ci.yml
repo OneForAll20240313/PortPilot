@@ -49,3 +49,33 @@ jobs:
           name: test-reports
           path: build/Testing/**
           retention-days: 30
+
+  # #36 UI 适配层 Qt 信号桥接验证：BUILD_GUI=ON + Qt6 环境下编译 UI 薄壳并运行
+  # offscreen 探针，验证 SerialWorker → BufferService → QtSignalBridge → Qt 信号链路。
+  build-gui-bridge:
+    name: Build & Bridge Probe (Qt)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build tools + Qt6
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake g++ qt6-base-dev
+          sudo apt-get install -y libqt6core6 libqt6widgets6 libqt6gui6
+
+      - name: Configure (GUI ON)
+        run: cmake -S . -B build-gui -GNinja -DCMAKE_BUILD_TYPE=Debug -DBUILD_GUI=ON
+
+      - name: Build (GUI ON)
+        run: cmake --build build-gui -j
+
+      - name: Run offscreen bridge probe (SerialWorker → Qt 信号)
+        run: |
+          cd build-gui
+          out="$(timeout 60 env QT_QPA_PLATFORM=offscreen ./bin/portpilot 2>&1)"
+          echo "$out"
+          recv_count="$(echo "$out" | grep -c 'received=' || true)"
+          test "$recv_count" -ge 2 || { echo "FAIL: expected >=2 data frames reaching UI, got ${recv_count}"; exit 1; }
+          echo "GUI bridge probe PASS: ${recv_count} frames reached Qt slots"

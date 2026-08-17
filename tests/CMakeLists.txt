@@ -19,6 +19,7 @@ add_executable(portpilot_tests
     unit/core_serial_device_test.cpp
     unit/plugin_test.cpp
     unit/port_enumerator_test.cpp
+    unit/buffer_service_test.cpp
 )
 
 target_include_directories(portpilot_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
@@ -38,6 +39,7 @@ target_compile_definitions(portpilot_tests PRIVATE
 target_link_libraries(portpilot_tests PRIVATE
     portpilot_core
     portpilot_domain
+    portpilot_service
     portpilot_plugin
     GTest::gtest_main
     GTest::gmock

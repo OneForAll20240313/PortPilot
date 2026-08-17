@@ -35,4 +35,6 @@ if(BUILD_GUI)
         portpilot_service
         portpilot_ui
     )
+    # 与 UI 层一致禁用 Qt 关键字宏，避免 core::EventBus::emit 冲突（qt_signal_bridge 亦依赖）
+    target_compile_definitions(portpilot PRIVATE QT_NO_KEYWORDS)
 endif()
